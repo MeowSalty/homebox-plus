@@ -7,6 +7,8 @@ export default defineConfig({
   title: enConfig.title,
   description: enConfig.description,
   head: [['link', { rel: 'icon', type: 'image/svg+xml', href: '/img/favicon.svg' }]],
+  lastUpdated: true,
+  base: '/homebox-plus/',
   locales: {
     root: {
       label: 'English',

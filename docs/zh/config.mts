@@ -27,6 +27,16 @@ export default {
       }
     ],
     outlineTitle: '本页目录',
+    lastUpdatedText: '最后更新于',
+    returnToTopLabel: '返回顶部',
+    editLink: {
+      pattern: 'https://github.com/MeowSalty/homebox-plus/edit/main/docs/:path',
+      text: '在 GitHub 上编辑此页'
+    },
+    footer: {
+      message: '基于 MIT 许可证发布',
+      copyright: '版权所有 © Homebox Plus 贡献者'
+    },
     docFooter: {
       prev: '上一页',
       next: '下一页'

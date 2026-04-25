@@ -27,10 +27,17 @@ export default {
       }
     ],
     outlineTitle: 'On this page',
+    editLink: {
+      pattern: 'https://github.com/MeowSalty/homebox-plus/edit/main/docs/:path',
+      text: 'Edit this page on GitHub'
+    },
+    footer: {
+      message: 'Released under the MIT License',
+      copyright: 'Copyright © Homebox Plus Contributors'
+    },
     docFooter: {
       prev: 'Previous page',
       next: 'Next page'
     }
   }
 }
-
