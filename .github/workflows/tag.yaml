@@ -6,6 +6,36 @@ on:
       - v*
 
 jobs:
+  resolve-release-flags:
+    name: Resolve release publish flags
+    runs-on: ubuntu-latest
+    outputs:
+      publish_latest: ${{ steps.flags.outputs.publish_latest }}
+      publish_nightly: ${{ steps.flags.outputs.publish_nightly }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve flags
+        id: flags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --depth=1
+          TAG_COMMIT="$(git rev-parse "$GITHUB_SHA")"
+          MAIN_HEAD="$(git rev-parse "origin/main")"
+
+          echo "publish_latest=true" >> "$GITHUB_OUTPUT"
+
+          if [ "$TAG_COMMIT" = "$MAIN_HEAD" ]; then
+            echo "publish_nightly=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish_nightly=false" >> "$GITHUB_OUTPUT"
+          fi
+
   backend-tests:
     name: "Backend Server Tests"
     uses: ./.github/workflows/partial-backend.yaml
@@ -49,10 +79,15 @@ jobs:
 
   publish-tag:
     name: "Publish Tag"
+    needs:
+      - resolve-release-flags
     uses: ./.github/workflows/partial-publish.yaml
     with:
-      release: true
-      tag: ${{ github.ref_name }}
+      version_tag: ${{ github.ref_name }}
+      build_version: ${{ github.ref_name }}
+      publish_version_tag: true
+      publish_latest: ${{ needs.resolve-release-flags.outputs.publish_latest == 'true' }}
+      publish_nightly: ${{ needs.resolve-release-flags.outputs.publish_nightly == 'true' }}
 
   docs-build:
     name: Build docs

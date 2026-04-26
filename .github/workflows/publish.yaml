@@ -11,6 +11,7 @@ jobs:
     if: github.event_name != 'release'
     uses: ./.github/workflows/partial-publish.yaml
     with:
-      tag: nightly
+      build_version: nightly
+      publish_nightly: true
 
 

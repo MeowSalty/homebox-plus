@@ -3,10 +3,22 @@ name: Publish Docker Images
 on:
   workflow_call:
     inputs:
-      tag:
+      version_tag:
+        required: false
+        type: string
+        default: ""
+      build_version:
         required: true
         type: string
-      release:
+      publish_version_tag:
+        required: false
+        type: boolean
+        default: false
+      publish_latest:
+        required: false
+        type: boolean
+        default: false
+      publish_nightly:
         required: false
         type: boolean
         default: false
@@ -53,10 +65,9 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ inputs.tag }},enable=${{ inputs.release == false }}
-            type=raw,value=nightly,enable=${{ inputs.release == true }}
-            type=raw,value=latest,enable=${{ inputs.release == true }}
-            type=raw,value=${{ inputs.tag }},enable=${{ inputs.release == true }}
+            type=raw,value=${{ inputs.version_tag }},enable=${{ inputs.publish_version_tag && inputs.version_tag != '' }}
+            type=raw,value=latest,enable=${{ inputs.publish_latest }}
+            type=raw,value=nightly,enable=${{ inputs.publish_nightly }}
 
       - name: Build and push main image
         id: push
@@ -68,7 +79,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            VERSION=${{ inputs.tag }}
+            VERSION=${{ inputs.build_version }}
             COMMIT=${{ github.sha }}
             BUILD_TIME=${{ steps.prep.outputs.build_time }}
 
@@ -85,10 +96,9 @@ jobs:
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ inputs.tag }}-rootless,enable=${{ inputs.release == false }}
-            type=raw,value=nightly-rootless,enable=${{ inputs.release == true }}
-            type=raw,value=latest-rootless,enable=${{ inputs.release == true }}
-            type=raw,value=${{ inputs.tag }}-rootless,enable=${{ inputs.release == true }}
+            type=raw,value=${{ inputs.version_tag }}-rootless,enable=${{ inputs.publish_version_tag && inputs.version_tag != '' }}
+            type=raw,value=latest-rootless,enable=${{ inputs.publish_latest }}
+            type=raw,value=nightly-rootless,enable=${{ inputs.publish_nightly }}
 
       - name: Build and push rootless image
         id: push-rootless
@@ -101,7 +111,7 @@ jobs:
           tags: ${{ steps.meta-rootless.outputs.tags }}
           labels: ${{ steps.meta-rootless.outputs.labels }}
           build-args: |
-            VERSION=${{ inputs.tag }}
+            VERSION=${{ inputs.build_version }}
             COMMIT=${{ github.sha }}
             BUILD_TIME=${{ steps.prep.outputs.build_time }}
 
