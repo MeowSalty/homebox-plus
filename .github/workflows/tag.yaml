@@ -5,17 +5,14 @@ on:
     tags:
       - v*
 
-env:
-  FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
 jobs:
   backend-tests:
     name: "Backend Server Tests"
-    uses: hay-kot/homebox/.github/workflows/partial-backend.yaml@main
+    uses: ./.github/workflows/partial-backend.yaml
 
   frontend-tests:
     name: "Frontend and End-to-End Tests"
-    uses: hay-kot/homebox/.github/workflows/partial-frontend.yaml@main
+    uses: ./.github/workflows/partial-frontend.yaml
 
   goreleaser:
     name: goreleaser
@@ -52,12 +49,10 @@ jobs:
 
   publish-tag:
     name: "Publish Tag"
-    uses: hay-kot/homebox/.github/workflows/partial-publish.yaml@main
+    uses: ./.github/workflows/partial-publish.yaml
     with:
       release: true
       tag: ${{ github.ref_name }}
-    secrets:
-      GH_TOKEN: ${{ secrets.CR_PAT }}
 
   docs-build:
     name: Build docs

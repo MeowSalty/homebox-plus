@@ -1,4 +1,4 @@
-name: Frontend / E2E
+name: Publish Docker Images
 
 on:
   workflow_call:
@@ -11,20 +11,19 @@ on:
         type: boolean
         default: false
 
-    secrets:
-      GH_TOKEN:
-        required: true
-
 jobs:
   publish:
     name: "Publish Homebox"
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.20"
 
       - name: Set up QEMU
         id: qemu
@@ -36,54 +35,79 @@ jobs:
       - name: install buildx
         id: buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          install: true
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: login to container registry
-        run: docker login ghcr.io --username hay-kot --password $CR_PAT
-        env:
-          CR_PAT: ${{ secrets.GH_TOKEN }}
+      - name: Prepare build metadata
+        id: prep
+        run: echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
 
-      - name: build nightly image
-        if: ${{ inputs.release == false }}
-        run: |
-          docker build --push --no-cache \
-            --tag=ghcr.io/hay-kot/homebox:${{ inputs.tag }} \
-            --build-arg=COMMIT=$(git rev-parse HEAD) \
-            --build-arg=BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-            --platform=linux/amd64,linux/arm64,linux/arm/v7 .
+      - name: Extract metadata (main image)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ inputs.tag }},enable=${{ inputs.release == false }}
+            type=raw,value=nightly,enable=${{ inputs.release == true }}
+            type=raw,value=latest,enable=${{ inputs.release == true }}
+            type=raw,value=${{ inputs.tag }},enable=${{ inputs.release == true }}
 
-      - name: build nightly-rootless image
-        if: ${{ inputs.release == false }}
-        run: |
-          docker build --push --no-cache \
-            --tag=ghcr.io/hay-kot/homebox:${{ inputs.tag }}-rootless \
-            --build-arg=COMMIT=$(git rev-parse HEAD) \
-            --build-arg=BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-            --file Dockerfile.rootless \
-            --platform=linux/amd64,linux/arm64,linux/arm/v7 .
+      - name: Build and push main image
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ inputs.tag }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.prep.outputs.build_time }}
 
-      - name: build release tagged the image
-        if: ${{ inputs.release == true }}
-        run: |
-          docker build --push --no-cache \
-            --tag ghcr.io/hay-kot/homebox:nightly \
-            --tag ghcr.io/hay-kot/homebox:latest \
-            --tag ghcr.io/hay-kot/homebox:${{ inputs.tag }} \
-            --build-arg VERSION=${{ inputs.tag }} \
-            --build-arg COMMIT=$(git rev-parse HEAD) \
-            --build-arg BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-            --platform linux/amd64,linux/arm64,linux/arm/v7 .
+      - name: Generate artifact attestation (main image)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
-      - name: build release tagged the rootless image
-        if: ${{ inputs.release == true }}
-        run: |
-          docker build --push --no-cache \
-            --tag ghcr.io/hay-kot/homebox:nightly-rootless \
-            --tag ghcr.io/hay-kot/homebox:latest-rootless \
-            --tag ghcr.io/hay-kot/homebox:${{ inputs.tag }}-rootless \
-            --build-arg VERSION=${{ inputs.tag }} \
-            --build-arg COMMIT=$(git rev-parse HEAD) \
-            --build-arg BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-            --platform linux/amd64,linux/arm64,linux/arm/v7  \
-            --file Dockerfile.rootless .
+      - name: Extract metadata (rootless image)
+        id: meta-rootless
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ inputs.tag }}-rootless,enable=${{ inputs.release == false }}
+            type=raw,value=nightly-rootless,enable=${{ inputs.release == true }}
+            type=raw,value=latest-rootless,enable=${{ inputs.release == true }}
+            type=raw,value=${{ inputs.tag }}-rootless,enable=${{ inputs.release == true }}
+
+      - name: Build and push rootless image
+        id: push-rootless
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.rootless
+          push: true
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: ${{ steps.meta-rootless.outputs.tags }}
+          labels: ${{ steps.meta-rootless.outputs.labels }}
+          build-args: |
+            VERSION=${{ inputs.tag }}
+            COMMIT=${{ github.sha }}
+            BUILD_TIME=${{ steps.prep.outputs.build_time }}
+
+      - name: Generate artifact attestation (rootless image)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.push-rootless.outputs.digest }}
+          push-to-registry: true
