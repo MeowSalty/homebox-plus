@@ -57,7 +57,10 @@ jobs:
 
       - name: Prepare build metadata
         id: prep
-        run: echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+        shell: bash
+        run: |
+          echo "build_time=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+          echo "nightly_tag=nightly-$(date -u +'%Y%m%d')-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Extract metadata (main image)
         id: meta
@@ -68,6 +71,7 @@ jobs:
             type=raw,value=${{ inputs.version_tag }},enable=${{ inputs.publish_version_tag && inputs.version_tag != '' }}
             type=raw,value=latest,enable=${{ inputs.publish_latest }}
             type=raw,value=nightly,enable=${{ inputs.publish_nightly }}
+            type=raw,value=${{ steps.prep.outputs.nightly_tag }},enable=${{ inputs.publish_nightly }}
 
       - name: Build and push main image
         id: push
@@ -99,6 +103,7 @@ jobs:
             type=raw,value=${{ inputs.version_tag }}-rootless,enable=${{ inputs.publish_version_tag && inputs.version_tag != '' }}
             type=raw,value=latest-rootless,enable=${{ inputs.publish_latest }}
             type=raw,value=nightly-rootless,enable=${{ inputs.publish_nightly }}
+            type=raw,value=${{ steps.prep.outputs.nightly_tag }}-rootless,enable=${{ inputs.publish_nightly }}
 
       - name: Build and push rootless image
         id: push-rootless
